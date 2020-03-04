@@ -27,8 +27,12 @@ class App extends React.Component {
   constructor() {
     super()
     this.state = {
-        messages: []
+        messages: [],
+        joinableRooms: [],
+        joinedRooms :[]
     }
+
+    this.sendMessage = this.sendMessage.bind(this);
 } 
 
 
@@ -57,48 +61,85 @@ class App extends React.Component {
 
     chatManager.connect()
       .then(currentUser => {
-        console.log('Successful connection', currentUser)
-        currentUser.subscribeToRoomMultipart({
+        // console.log('Successful connection', currentUser)
+
+        /*
+        * Assign Current User To ba accesible In the class outside of this promise
+        */
+        this.currentUser = currentUser;
+
+        /*
+        * Fetch All Existed Rooms
+        */
+        this.currentUser.getJoinableRooms()
+        .then(joinableRooms => {
+            this.setState({
+                joinableRooms,
+                joinedRooms: this.currentUser.rooms
+                
+            })
+        })
+        .catch(err => {
+          console.log('Error onFetching Rooms', err)
+        })
+
+        /*
+        * Fetch All Existed Messages and Listen to New Ones
+        */
+       this.currentUser.subscribeToRoomMultipart({
           roomId: 'e269bb36-f3a0-450c-8635-397d00988c92',
           hooks: {
             onMessage: message => {
-              console.log("received message", message);
+              // console.log("received message", message);
               this.setState({
                 messages: [...this.state.messages, message]
+                //messages: this.state.messages.push(message)
             })
             }
           },
           messageLimit: 10
+        }) 
+        .catch(err => {
+          console.log('Error on Fetching Messages', err)
         })
+  
 
-        currentUser.fetchMultipartMessages({
-          roomId: 'e269bb36-f3a0-450c-8635-397d00988c92',
-          //initialId: 42,
-         // direction: 'older',
-          limit: 10,
-        })
-          .then(messages => {
-            // do something with the messages
-            console.log('msgs ......', messages);
-          })
-          .catch(err => {
-            console.log(`Error fetching messages: ${err}`)
-          })
+        // this.currentUser.fetchMultipartMessages({
+        //   roomId: 'e269bb36-f3a0-450c-8635-397d00988c92',
+        //   //initialId: 42,
+        //  // direction: 'older',
+        //   limit: 10,
+        // })
+        //   .then(messages => {
+        //     // do something with the messages
+        //    // console.log('msgs ......', messages);
+        //   })
+        //   .catch(err => {
+        //     console.log(`Error fetching messages: ${err}`)
+        //   })
       })
       .catch(err => {
         console.log('Error on connection', err)
       })
 
-
+//component did mount
   }
+
+
+  sendMessage(text) {
+    this.currentUser.sendMessage({
+        text,
+        roomId:'e269bb36-f3a0-450c-8635-397d00988c92'
+    })
+}
 
   render() {
     return (
 
       <div className="app">
-        <RoomList />
+        <RoomList rooms={[...this.state.joinableRooms, ...this.state.joinedRooms]} />
         <MessageList messages={this.state.messages} />
-        <SendMessageForm />
+        <SendMessageForm sendMessage={this.sendMessage} />
         <NewRoomForm />
       </div>
     );
