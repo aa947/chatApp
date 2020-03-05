@@ -29,10 +29,16 @@ class App extends React.Component {
     this.state = {
         messages: [],
         joinableRooms: [],
-        joinedRooms :[]
+        joinedRooms :[],
+        roomId:null
     }
 
     this.sendMessage = this.sendMessage.bind(this);
+    this.subscribeToRoom = this.subscribeToRoom.bind(this);
+    this.getRooms = this.getRooms.bind(this)
+    this.createRoom = this.createRoom.bind(this)
+
+
 } 
 
 
@@ -45,19 +51,6 @@ class App extends React.Component {
       })
     })
 
-    // chatManager.connect()
-    // .then(currentUser => {
-    //   console.log('connected succesfully ...')
-    //     currentUser.subscribeToRoomMultipart({
-    //         roomId: 'e269bb36-f3a0-450c-8635-397d00988c92',
-    //         messageLimit: 10,
-    //         hooks: {
-    //           onMultipartMessage: message => {
-    //                 console.log('message.text: ', message.text);
-    //             }
-    //         }
-    //     })
-    // })
 
     chatManager.connect()
       .then(currentUser => {
@@ -68,42 +61,11 @@ class App extends React.Component {
         */
         this.currentUser = currentUser;
 
-        /*
-        * Fetch All Existed Rooms
-        */
-        this.currentUser.getJoinableRooms()
-        .then(joinableRooms => {
-            this.setState({
-                joinableRooms,
-                joinedRooms: this.currentUser.rooms
-                
-            })
-        })
-        .catch(err => {
-          console.log('Error onFetching Rooms', err)
-        })
+     //   this.subscribeToRoom('e269bb36-f3a0-450c-8635-397d00988c92');
+        this.getRooms();
 
-        /*
-        * Fetch All Existed Messages and Listen to New Ones
-        */
-       this.currentUser.subscribeToRoomMultipart({
-          roomId: 'e269bb36-f3a0-450c-8635-397d00988c92',
-          hooks: {
-            onMessage: message => {
-              // console.log("received message", message);
-              this.setState({
-                messages: [...this.state.messages, message]
-                //messages: this.state.messages.push(message)
-            })
-            }
-          },
-          messageLimit: 10
-        }) 
-        .catch(err => {
-          console.log('Error on Fetching Messages', err)
-        })
-  
-
+       
+      
         // this.currentUser.fetchMultipartMessages({
         //   roomId: 'e269bb36-f3a0-450c-8635-397d00988c92',
         //   //initialId: 42,
@@ -126,22 +88,90 @@ class App extends React.Component {
   }
 
 
+  /*
+  * Fetch All Existed Rooms
+  */     
+  getRooms(){
+  this.currentUser.getJoinableRooms()
+  .then(joinableRooms => {
+      this.setState({
+          joinableRooms,
+          joinedRooms: this.currentUser.rooms
+          
+      })
+  })
+  .catch(err => {
+    console.log('Error onFetching Rooms', err)
+  })
+}
+
+
+
+ /*
+  * Fetch All Existed Messages and Listen to New Ones
+  */
+  subscribeToRoom(roomId) {
+    this.setState({messages:[]});
+    this.currentUser.subscribeToRoomMultipart({
+      roomId: roomId,
+      hooks: {
+        onMessage: message => {
+          // console.log("received message", message);
+          this.setState({
+            messages: [...this.state.messages, message]
+            //messages: this.state.messages.push(message)
+        })
+        }
+      },
+      messageLimit: 10
+    })
+    .then(room => {
+      this.setState({
+        roomId: room.id
+    })
+      this.getRooms()
+      })
+    .catch(err => {
+      console.log('Error on Fetching Messages', err)
+    })
+  }
+
+
   sendMessage(text) {
     this.currentUser.sendMessage({
         text,
-        roomId:'e269bb36-f3a0-450c-8635-397d00988c92'
+        roomId:this.state.roomId
     })
 }
+
+
+createRoom(name) {
+  this.currentUser.createRoom({
+      name
+  })
+  .then(room => this.subscribeToRoom(room.id))
+  .catch(err => console.log('error with createRoom: ', err))
+}
+
 
   render() {
     return (
 
       <div className="app">
-        <RoomList rooms={[...this.state.joinableRooms, ...this.state.joinedRooms]} />
-        <MessageList messages={this.state.messages} />
-        <SendMessageForm sendMessage={this.sendMessage} />
-        <NewRoomForm />
-      </div>
+        <RoomList
+        roomId ={this.state.roomId}
+         subscribeToRoom={this.subscribeToRoom}  
+         rooms={[...this.state.joinableRooms, ...this.state.joinedRooms]}
+          />
+        <MessageList 
+        roomId ={this.state.roomId}
+        messages={this.state.messages}
+         />
+        <SendMessageForm
+        disabled={!this.state.roomId}
+         sendMessage={this.sendMessage} 
+         />
+        <NewRoomForm createRoom={this.createRoom} />      </div>
     );
   }
 }
